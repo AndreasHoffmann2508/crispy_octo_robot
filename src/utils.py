@@ -65,8 +65,6 @@ def load_data_from_google_drive(url):
 
 
 
-
-
 # Function that cleans the dataframe for different outliers and other irrelevant data
 def clean_taxi_data(df, remove_outliers=True):
     """
@@ -410,10 +408,6 @@ def prepare_prophet_data(taxi_type='yellow', years=None, months=None):
     else:
         print("\nFailed to create dataset. No data was downloaded.")
         return None
-
-
-
-
 
 
 
