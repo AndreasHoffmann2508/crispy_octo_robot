@@ -586,7 +586,7 @@ def create_top_routes_map(df_taxi, df_zones, top_n, output_file):
         'zone': 'end_zone'
     }).drop(columns=['LocationID'])
 
-    print("\nHere is a sneak peek at the most popular routes:")
+    print("\nHere is the most popular routes:")
     print(df_routes_mapped[['start_zone', 'end_zone', 'trip_count']].head(10).to_string(index=False))
 
     # 5. Kepler.gl configuration to create "Arcs"
