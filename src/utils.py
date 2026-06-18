@@ -638,7 +638,7 @@ def create_top_routes_map(df_taxi, df_zones, top_n, output_file):
                 "latitude": 40.75,
                 "longitude": -73.95,
                 "pitch": 45,
-                "zoom": 10
+                "zoom": 10.3
             }
         }
     }
