@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 
 
+
+
 def create_scatterplot(df, x_col, y_col, title, xlabel, ylabel):
     """
     This function creates a scatter plot with a linear regression line from a DataFrame.
