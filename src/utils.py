@@ -482,6 +482,7 @@ def create_taxi_hotspot_map(data, df_zones, dataset_name):
     ## KEPLER MAP (3D COLUMNS)
     pickup_agg = hotspot_pickup[['pickup_lat', 'pickup_lng', 'ride_count']].rename(columns={'pickup_lat': 'lat', 'pickup_lng': 'lng'})
     dropoff_agg = hotspot_dropoff[['dropoff_lat', 'dropoff_lng', 'ride_count']].rename(columns={'dropoff_lat': 'lat', 'dropoff_lng': 'lng'})
+    
 
     nyc_3d_config = {
         "version": "v1",

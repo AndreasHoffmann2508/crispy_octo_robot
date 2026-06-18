@@ -164,4 +164,4 @@ Desktop.ini
 *.swp
 *.swo
 *~
-*.html
+*.html ### Keep HTML files for visualization outputs
