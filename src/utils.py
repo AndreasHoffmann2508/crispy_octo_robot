@@ -756,3 +756,94 @@ def evaluate_prophet_forecast(df, taxi_type="Yellow", split_date='2019-11-01', z
     plt.show()
     
     return model, forecast
+
+def get_a_random_chunk_property(data):
+    """Returnerer en tilfældig egenskab fra en tilfældig asteroide i datasættet."""
+    chunk = random.choice(data)
+    date  = random.choice(list(chunk['near_earth_objects'].keys()))
+    neo   = random.choice(chunk['near_earth_objects'][date])
+    prop  = random.choice(list(neo.keys()))
+    return {prop: neo[prop]}
+
+
+def build_neo_dataframe(data):
+    """
+    Bygger et Pandas DataFrame fra rådata fra NASA\'s NEO API.
+
+    Returnerer én række per (asteroide, dato) med:
+        id, name, date, size_km, is_hazardous,
+        distance_km, velocity_kmh, Status, week
+
+    NEOs uden close_approach_data springes over.
+    """
+    records = []
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for date, neos in chunk['near_earth_objects'].items():
+            for neo in neos:
+                if not neo['close_approach_data']:
+                    continue
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                records.append({
+                    'id':           neo['id'],
+                    'name':         neo['name'],
+                    'date':         pd.to_datetime(date),
+                    'size_km':      (min_dia + max_dia) / 2,
+                    'is_hazardous': neo['is_potentially_hazardous_asteroid'],
+                    'distance_km':  float(neo['close_approach_data'][0]['miss_distance']['kilometers']),
+                    'velocity_kmh': float(neo['close_approach_data'][0]['relative_velocity']['kilometers_per_hour']),
+                })
+
+    df = pd.DataFrame(records).drop_duplicates(subset=['id', 'date'])
+    df['Status'] = df['is_hazardous'].map({True: 'Hazardous (PHA)', False: 'Harmless'})
+    df['week']   = df['date'].dt.to_period('W').apply(lambda p: p.start_time)
+    return df
+
+
+def get_daily_sizes(data):
+    """
+    Returnerer en dict { 'YYYY-MM-DD': [størrelser_km] } for alle NEOs.
+    Bruges til at beregne daglige gennemsnit, median mm.
+    """
+    daily = {}
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for date, neos in chunk['near_earth_objects'].items():
+            if date not in daily:
+                daily[date] = []
+            for neo in neos:
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                daily[date].append((min_dia + max_dia) / 2)
+    return daily
+
+
+def get_all_sizes(data):
+    """
+    Returnerer en flad liste med gennemsnitsstørrelsen (km) for ALLE NEOs.
+    Bruges til statistisk analyse på tværs af hele datasættet.
+    """
+    sizes = []
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for neos in chunk['near_earth_objects'].values():
+            for neo in neos:
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                sizes.append((min_dia + max_dia) / 2)
+    return sizes
+
+
+def load_data_from_google_drive(url):
+    """
+    Loader en CSV-fil direkte fra Google Drive.
+    Konverterer den delte link-URL til en download-URL automatisk.
+    """
+    import pandas as pd
+    url_processed = 'https://drive.google.com/uc?id=' + url.split('/')[-2]
+    df = pd.read_csv(url_processed)
+    return df
