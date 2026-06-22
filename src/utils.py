@@ -847,3 +847,422 @@ def load_data_from_google_drive(url):
     url_processed = 'https://drive.google.com/uc?id=' + url.split('/')[-2]
     df = pd.read_csv(url_processed)
     return df
+
+
+
+
+
+import numpy as np
+
+def get_daily_averages(data):
+    """
+    Processes the raw NASA data chunks and calculates the average size of NEOs for each day.
+    Returns a dictionary with dates as keys and average sizes (km) as values.
+    """
+    # 1. Create an empty dictionary to keep track of dates and their corresponding sizes
+    daily_sizes = {}
+
+    # 2. Loop through each week/chunk in your 'data' list
+    for chunk in data:
+        # The NASA API stores the actual date data under the key 'near_earth_objects'
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                
+                # If the date does not exist in our dictionary yet, create it with an empty list
+                if date not in daily_sizes:
+                    daily_sizes[date] = []
+                    
+                # Loop through all asteroids (NEOs) for that specific date
+                for neo in neos:
+                    # We take the average of the min and max estimated diameter in kilometers
+                    min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                    max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                    avg_neo_size = (min_dia + max_dia) / 2
+                    
+                    # Store this asteroid's size under the correct date
+                    daily_sizes[date].append(avg_neo_size)
+
+    # 3. Calculate the final average (mean) for each day
+    daily_averages = {}
+    for date, sizes in daily_sizes.items():
+        if sizes: # Ensures that there actually is data for the day
+            daily_averages[date] = np.mean(sizes)
+            
+    #Return data
+    return daily_averages
+
+
+
+
+
+def calculate_hazardous_proportion(data):
+    """
+    Calculates the total number of NEOs, the number of potentially hazardous NEOs,
+    and their overall percentage proportion across all data chunks.
+    Returns a dictionary with the results.
+    """
+    # Start counters
+    total_neos = 0
+    hazardous_neos = 0
+
+    # Loop through the data
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                for neo in neos:
+                    
+                    # 1. Add 1 to the total counter for each asteroid we encounter
+                    total_neos += 1
+                    
+                    # 2. Check if NASA has marked it as hazardous
+                    if neo['is_potentially_hazardous_asteroid'] == True:
+                        hazardous_neos += 1
+
+    # Calculate the proportion in percent if data exists
+    if total_neos > 0:
+        proportion = (hazardous_neos / total_neos) * 100
+    else:
+        proportion = 0.0
+
+    return {
+        'total_neos': total_neos,
+        'hazardous_neos': hazardous_neos,
+        'proportion_percent': proportion
+    }
+
+
+
+def get_closest_neos_per_day(data):
+    """
+    Finds the closest asteroid to Earth for each specific day in the dataset.
+    Returns a dictionary structured with dates as keys, containing the asteroid name and distance.
+    """
+    # 1. A dictionary to store the closest asteroid for each day
+    closest_neos_per_day = {}
+
+    # 2. Loop through the data layer by layer
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                
+                # Starting values for this specific day
+                closest_distance = float('inf')  # Set to "infinity" initially so any number will be smaller
+                closest_neo_name = None
+                
+                for neo in neos:
+                    # Check if there actually is close_approach_data available
+                    if neo['close_approach_data']:
+                        # Get the distance in kilometers and convert it to a number (float)
+                        distance_str = neo['close_approach_data'][0]['miss_distance']['kilometers']
+                        distance = float(distance_str)
+                        
+                        # If this distance is closer (smaller) than the previous closest, we store it
+                        if distance < closest_distance:
+                            closest_distance = distance
+                            closest_neo_name = neo['name']
+                
+                # Store the result for the day in our dictionary (if an asteroid was found)
+                if closest_neo_name is not None:
+                    closest_neos_per_day[date] = {
+                        'name': closest_neo_name,
+                        'distance_km': closest_distance
+                    }
+                    
+    # Return the dictionary to the main script
+    return closest_neos_per_day
+
+
+
+import pandas as pd
+
+def calculate_size_statistics(data):
+    """
+    Extracts all asteroid sizes and calculates key statistical measures:
+    Mean, Median, Mode, Standard Deviation, Range, and the 95th Percentile.
+    Returns a dictionary containing all computed metrics.
+    """
+    # 1. Extract ALL asteroid sizes into a flat list
+    all_sizes = []
+
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                for neo in neos:
+                    # We use the average of min and max diameter in km
+                    min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                    max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                    avg_size = (min_dia + max_dia) / 2
+                    all_sizes.append(avg_size)
+
+    # 2. Convert the list to a Pandas Series for easy statistics
+    df_sizes = pd.Series(all_sizes)
+
+    # Check if we have data to avoid runtime errors
+    if df_sizes.empty:
+        return {}
+
+    # 3. Calculate the required statistical measures
+    mean_val = df_sizes.mean()
+    median_val = df_sizes.median()
+    std_val = df_sizes.std()
+    
+    # Mode: most frequent value (returns the first one if all are unique)
+    mode_val = df_sizes.mode()[0]
+
+    # --- Two extra statistical methods for deeper analysis ---
+    # Extra 1: Range = Max - Min
+    min_val = df_sizes.min()
+    max_val = df_sizes.max()
+    range_val = max_val - min_val
+
+    # Extra 2: 95th Percentile (The top 5% largest asteroids)
+    percentile_95 = df_sizes.quantile(0.95)
+
+    # Return all metrics structured in a dictionary
+    return {
+        'total_count': len(df_sizes),
+        'mean': mean_val,
+        'median': median_val,
+        'mode': mode_val,
+        'std_dev': std_val,
+        'min': min_val,
+        'max': max_val,
+        'range': range_val,
+        'percentile_95': percentile_95
+    }
+
+
+
+import pandas as pd
+from scipy import stats
+
+def analyze_size_hazardous_correlation(data):
+    """
+    Extracts asteroid sizes and hazardous statuses, then calculates the 
+    Point-Biserial correlation coefficient, p-value, and group mean sizes.
+    Returns a dictionary containing all statistical results.
+    """
+    # 1. Extract both size and hazardous status for ALL asteroids
+    sizes = []
+    is_hazardous = []
+
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                for neo in neos:
+                    # Size (Average of min and max in km)
+                    min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                    max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                    avg_size = (min_dia + max_dia) / 2
+                    
+                    # Hazardous (True/False -> converted to 1 or 0 for statistics)
+                    hazardous_status = 1 if neo['is_potentially_hazardous_asteroid'] else 0
+                    
+                    sizes.append(avg_size)
+                    is_hazardous.append(hazardous_status)
+
+    # 2. Load data into a Pandas DataFrame
+    df_corr = pd.DataFrame({
+        'Size_km': sizes,
+        'Is_Hazardous': is_hazardous
+    })
+
+    # Check if we have data to avoid calculation errors
+    if df_corr.empty:
+        return {}
+
+    # 3. Calculate Point-Biserial Correlation
+    correlation, p_value = stats.pointbiserialr(df_corr['Is_Hazardous'], df_corr['Size_km'])
+
+    # 4. Calculate the average size for the two groups to provide context
+    mean_safe = df_corr[df_corr['Is_Hazardous'] == 0]['Size_km'].mean()
+    mean_hazardous = df_corr[df_corr['Is_Hazardous'] == 1]['Size_km'].mean()
+
+    # Return results inside a dictionary
+    return {
+        'correlation': correlation,
+        'p_value': p_value,
+        'mean_safe': mean_safe,
+        'mean_hazardous': mean_hazardous
+    }
+
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+# 1. Prepare the data
+sizes = []
+is_hazardous = []
+
+for chunk in data:
+    if 'near_earth_objects' in chunk:
+        for date, neos in chunk['near_earth_objects'].items():
+            for neo in neos:
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                sizes.append((min_dia + max_dia) / 2)
+                # Labels translated to English
+                is_hazardous.append('Hazardous (PHA)' if neo['is_potentially_hazardous_asteroid'] else 'Harmless')
+
+df_plot = pd.DataFrame({'Size (km)': sizes, 'Status': is_hazardous})
+
+# 2. Design the plot ("Think like a designer" & "Eliminate clutter")
+sns.set_theme(style="white") # Removes the dark grey background and heavy gridlines
+plt.figure(figsize=(9, 5))
+
+# Strategic color palette (Muted grey vs. Attention-grabbing red)
+color_palette = {'Harmless': '#95a5a6', 'Hazardous (PHA)': '#e74c3c'}
+
+# Draw the boxplot without outliers for better readability
+ax = sns.boxplot(
+    x='Size (km)', 
+    y='Status', 
+    data=df_plot, 
+    palette=color_palette, 
+    showfliers=False, 
+    width=0.5
+)
+
+# 3. Clean up the chart ("Eliminate clutter")
+sns.despine(left=True, bottom=True)
+
+# 4. English titles and labels
+plt.title('Potentially Hazardous Asteroids are Markedly Larger Than Harmless Ones', fontsize=14, fontweight='bold', pad=20, loc='left')
+plt.xlabel('Estimated Diameter (kilometers)', fontsize=11, color='#2c3e50')
+plt.ylabel('') # Removed because 'Harmless' and 'Hazardous' labels are self-explanatory
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+#________________________________________________________________________________________________________
+#Nasa
+
+#Task 3: Data Visualization Part A
+
+# Default farve-konfiguration
+BLUE = '#2980b9'
+
+
+def build_neo_viz_dataframe(data):
+    """Træk dato, id, navn og gennemsnitlig størrelse ud for ALLE asteroider.
+
+    Parameters
+    ----------
+    data : list
+        The raw NASA NEO data: a list of chunks, each containing a
+        ``near_earth_objects`` dict that maps date strings to lists of NEOs.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns: date, id, name, size_km, week. Duplicates (same date + id
+        across overlapping chunks) are removed.
+    """
+    records = []
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                for neo in neos:
+                    min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                    max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                    avg_size = (min_dia + max_dia) / 2
+                    records.append({
+                        'date': pd.to_datetime(date),
+                        'id': neo['id'],
+                        'name': neo['name'],
+                        'size_km': avg_size,
+                    })
+
+    df_viz = pd.DataFrame(records)
+
+    # Samme dato kan optræde i to chunks (hvor ugerne overlapper) -> fjern dubletter
+    df_viz = df_viz.drop_duplicates(subset=['date', 'id'])
+
+    # Uge-kolonne (mandag i ugen) til de ugentlige plots
+    df_viz['week'] = df_viz['date'].dt.to_period('W').apply(lambda p: p.start_time)
+
+    return df_viz
+
+
+def plot_neos_per_week(df_viz, color=BLUE):
+    """(a) Line plot: antal NEOs pr. uge."""
+    sns.set_theme(style="white")
+
+    weekly_counts = df_viz.groupby('week').size().reset_index(drop=True)
+    weekly_counts.index = weekly_counts.index + 1   # uge 1, 2, 3, ...
+
+    plt.figure(figsize=(11, 4))
+    sns.lineplot(x=weekly_counts.index, y=weekly_counts.values, color=color, linewidth=2)
+    sns.despine()
+    plt.title('Number of NEOs per Week', fontsize=14, fontweight='bold', loc='left', pad=15)
+    plt.xlabel('Week number'); plt.ylabel('Number of NEOs')
+    plt.ylim(bottom=0)
+    plt.margins(x=0)
+    plt.xticks(weekly_counts.index[::3], fontsize=11)   # hver 3. uge vises
+    plt.tight_layout(); plt.show()
+
+
+def plot_neo_size_distribution(df_viz, color=BLUE):
+    """(b) Histogram: distribution af NEO-størrelser."""
+    sns.set_theme(style="white")
+
+    plt.figure(figsize=(9, 4))
+    sns.histplot(df_viz['size_km'], bins=50, color=color, log_scale=True)  # log: størrelser er meget skæve
+    sns.despine()
+    plt.title('Distribution of NEO Sizes', fontsize=14, fontweight='bold', loc='left', pad=15)
+    plt.xlabel('Estimated Diameter (km, log scale)'); plt.ylabel('Number of NEOs')
+    plt.tight_layout(); plt.show()
+
+
+def plot_avg_neo_size_per_week(df_viz, color=BLUE):
+    """(c) Bar plot: gennemsnitlig NEO-størrelse pr. uge."""
+    sns.set_theme(style="white")
+
+    weekly_avg = df_viz.groupby('week')['size_km'].mean()
+
+    plt.figure(figsize=(12, 4))
+    sns.barplot(x=list(range(len(weekly_avg))), y=weekly_avg.values, color=color)
+    sns.despine()
+    plt.title('Average NEO Size per Week', fontsize=14, fontweight='bold', loc='left', pad=15)
+    plt.xlabel('Week index (1 = first week)'); plt.ylabel('Average Diameter (km)')
+    plt.xticks([])  # for mange uger til at vise alle labels
+    plt.tight_layout(); plt.show()
+
+
+def plot_neo_weekday_heatmap(df_viz):
+    """(d) Seaborn heatmap: antal NEOs pr. ugedag x uge."""
+    sns.set_theme(style="white")
+
+    # Arbejd på en kopi, så df_viz ikke muteres af de ekstra kolonner
+    df = df_viz.copy()
+    df['weekday'] = pd.Categorical(
+        df['date'].dt.day_name(),
+        categories=['Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                    'Friday', 'Saturday', 'Sunday'], ordered=True)
+    df['iso_week'] = df['date'].dt.isocalendar().week
+    pivot = df.pivot_table(index='weekday', columns='iso_week',
+                           values='id', aggfunc='count', fill_value=0)
+
+    plt.figure(figsize=(14, 3.2))
+    sns.heatmap(pivot, cmap='rocket', cbar_kws={'label': 'Number of NEOs'})
+    plt.title('NEOs: Weekday x Week of Year', fontsize=14, fontweight='bold', loc='left', pad=15)
+    plt.xlabel('Week of year'); plt.ylabel('')
+    plt.tight_layout(); plt.show()
+
+
+def run_task3_visualizations(data):
+    """Convenience wrapper: build the dataframe and draw all four plots.
+
+    Returns the dataframe in case you want to inspect it afterwards.
+    """
+    df_viz = build_neo_viz_dataframe(data)
+    plot_neos_per_week(df_viz)
+    plot_neo_size_distribution(df_viz)
+    plot_avg_neo_size_per_week(df_viz)
+    plot_neo_weekday_heatmap(df_viz)
+    return df_viz
