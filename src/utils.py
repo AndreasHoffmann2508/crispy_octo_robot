@@ -757,6 +757,9 @@ def evaluate_prophet_forecast(df, taxi_type="Yellow", split_date='2019-11-01', z
     
     return model, forecast
 
+
+
+import random
 def get_a_random_chunk_property(data):
     """Returnerer en tilfældig egenskab fra en tilfældig asteroide i datasættet."""
     chunk = random.choice(data)
@@ -1091,50 +1094,54 @@ def analyze_size_hazardous_correlation(data):
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-
+def plot_asteroid_size_comparison(data):
+    """
+    Creates a boxplot comparing the sizes of potentially hazardous asteroids (PHA) 
+    against harmless ones, using a clean and designer-friendly approach.
+    """
 # 1. Prepare the data
-sizes = []
-is_hazardous = []
+    sizes = []
+    is_hazardous = []
 
-for chunk in data:
-    if 'near_earth_objects' in chunk:
-        for date, neos in chunk['near_earth_objects'].items():
-            for neo in neos:
-                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
-                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
-                sizes.append((min_dia + max_dia) / 2)
-                # Labels translated to English
-                is_hazardous.append('Hazardous (PHA)' if neo['is_potentially_hazardous_asteroid'] else 'Harmless')
+    for chunk in data:
+        if 'near_earth_objects' in chunk:
+            for date, neos in chunk['near_earth_objects'].items():
+                for neo in neos:
+                    min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                    max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                    sizes.append((min_dia + max_dia) / 2)
+                    # Labels translated to English
+                    is_hazardous.append('Hazardous (PHA)' if neo['is_potentially_hazardous_asteroid'] else 'Harmless')
 
-df_plot = pd.DataFrame({'Size (km)': sizes, 'Status': is_hazardous})
+    df_plot = pd.DataFrame({'Size (km)': sizes, 'Status': is_hazardous})
 
-# 2. Design the plot ("Think like a designer" & "Eliminate clutter")
-sns.set_theme(style="white") # Removes the dark grey background and heavy gridlines
-plt.figure(figsize=(9, 5))
+    # 2. Design the plot ("Think like a designer" & "Eliminate clutter")
+    sns.set_theme(style="white") # Removes the dark grey background and heavy gridlines
+    plt.figure(figsize=(9, 5))
 
-# Strategic color palette (Muted grey vs. Attention-grabbing red)
-color_palette = {'Harmless': '#95a5a6', 'Hazardous (PHA)': '#e74c3c'}
+    # Strategic color palette (Muted grey vs. Attention-grabbing red)
+    color_palette = {'Harmless': '#95a5a6', 'Hazardous (PHA)': '#e74c3c'}
 
-# Draw the boxplot without outliers for better readability
-ax = sns.boxplot(
-    x='Size (km)', 
-    y='Status', 
-    data=df_plot, 
-    palette=color_palette, 
-    showfliers=False, 
-    width=0.5
-)
+    # Draw the boxplot without outliers for better readability
+    ax = sns.boxplot(
+        x='Size (km)', 
+        y='Status', 
+        data=df_plot, 
+        palette=color_palette, 
+        showfliers=False, 
+        width=0.5
+    )
 
-# 3. Clean up the chart ("Eliminate clutter")
-sns.despine(left=True, bottom=True)
+    # 3. Clean up the chart ("Eliminate clutter")
+    sns.despine(left=True, bottom=True)
 
-# 4. English titles and labels
-plt.title('Potentially Hazardous Asteroids are Markedly Larger Than Harmless Ones', fontsize=14, fontweight='bold', pad=20, loc='left')
-plt.xlabel('Estimated Diameter (kilometers)', fontsize=11, color='#2c3e50')
-plt.ylabel('') # Removed because 'Harmless' and 'Hazardous' labels are self-explanatory
+    # 4. English titles and labels
+    plt.title('Potentially Hazardous Asteroids are Markedly Larger Than Harmless Ones', fontsize=14, fontweight='bold', pad=20, loc='left')
+    plt.xlabel('Estimated Diameter (kilometers)', fontsize=11, color='#2c3e50')
+    plt.ylabel('') # Removed because 'Harmless' and 'Hazardous' labels are self-explanatory
 
-plt.tight_layout()
-plt.show()
+    plt.tight_layout()
+    plt.show()
 
 
 
