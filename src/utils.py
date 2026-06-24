@@ -1148,26 +1148,30 @@ def plot_asteroid_size_comparison(data):
 
 #Task 3: Data Visualization Part A
 
-# Default farve-konfiguration
+# Colour configuration
 BLUE = '#2980b9'
 
 
 def build_neo_viz_dataframe(data):
-    """Træk dato, id, navn og gennemsnitlig størrelse ud for ALLE asteroider.
-
+    """Extract date, id, name and average size for ALL asteroids.
+ 
     Parameters
     ----------
     data : list
         The raw NASA NEO data: a list of chunks, each containing a
         ``near_earth_objects`` dict that maps date strings to lists of NEOs.
-
+ 
     Returns
     -------
     pandas.DataFrame
         Columns: date, id, name, size_km, week. Duplicates (same date + id
         across overlapping chunks) are removed.
     """
+    # Build a flat list of dicts first (one dict = one asteroid observation).
+    # Collecting rows in a list and creating the DataFrame at the end is faster than appending to a DataFrame inside the loop.
     records = []
+    
+    # data is a list of "chunks" (one per week from the API). Loop over all of them.
     for chunk in data:
         if 'near_earth_objects' in chunk:
             for date, neos in chunk['near_earth_objects'].items():
@@ -1175,6 +1179,7 @@ def build_neo_viz_dataframe(data):
                     min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
                     max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
                     avg_size = (min_dia + max_dia) / 2
+                    # Keep only the fields we need for the plots (one row per asteroid).
                     records.append({
                         'date': pd.to_datetime(date),
                         'id': neo['id'],
@@ -1184,39 +1189,42 @@ def build_neo_viz_dataframe(data):
 
     df_viz = pd.DataFrame(records)
 
-    # Samme dato kan optræde i to chunks (hvor ugerne overlapper) -> fjern dubletter
+    # The API fetches 7 days at a time and the weeks overlap at the edges, so the same (date, asteroid) can appear twice --> remove  the duplicates,
     df_viz = df_viz.drop_duplicates(subset=['date', 'id'])
 
-    # Uge-kolonne (mandag i ugen) til de ugentlige plots
+    # Create a "week" column: round each date down to the Monday of the same week.--> x-axis
     df_viz['week'] = df_viz['date'].dt.to_period('W').apply(lambda p: p.start_time)
 
     return df_viz
 
 
 def plot_neos_per_week(df_viz, color=BLUE):
-    """(a) Line plot: antal NEOs pr. uge."""
+    """(a) Line plot: number of NEOs per week."""
+    # white seaborn theme 
     sns.set_theme(style="white")
-
+ 
+    # Count how many asteroids there are per week.
     weekly_counts = df_viz.groupby('week').size().reset_index(drop=True)
-    weekly_counts.index = weekly_counts.index + 1   # uge 1, 2, 3, ...
-
+    # Shift from 0-based to 1-based so the x-axis shows "week 1, 2, 3 ..." 
+    weekly_counts.index = weekly_counts.index + 1
+ 
     plt.figure(figsize=(11, 4))
     sns.lineplot(x=weekly_counts.index, y=weekly_counts.values, color=color, linewidth=2)
-    sns.despine()
+    sns.despine()  # remove the top and right axis border to remove clutter
     plt.title('Number of NEOs per Week', fontsize=14, fontweight='bold', loc='left', pad=15)
     plt.xlabel('Week number'); plt.ylabel('Number of NEOs')
-    plt.ylim(bottom=0)
-    plt.margins(x=0)
-    plt.xticks(weekly_counts.index[::3], fontsize=11)   # hver 3. uge vises
+    plt.ylim(bottom=0)   # start the y-axis at 0 so the counts aren't visually exaggerated
+    plt.margins(x=0)     # remove empty padding at the left/right edges of the line
+    plt.xticks(weekly_counts.index[::3], fontsize=11)   # show only every 3rd week -> less clutter
     plt.tight_layout(); plt.show()
 
 
 def plot_neo_size_distribution(df_viz, color=BLUE):
-    """(b) Histogram: distribution af NEO-størrelser."""
+    """(b) Histogram: distribution of NEO sizes."""
     sns.set_theme(style="white")
-
+ 
     plt.figure(figsize=(9, 4))
-    sns.histplot(df_viz['size_km'], bins=50, color=color, log_scale=True)  # log: størrelser er meget skæve
+    sns.histplot(df_viz['size_km'], bins=50, color=color, log_scale=True)
     sns.despine()
     plt.title('Distribution of NEO Sizes', fontsize=14, fontweight='bold', loc='left', pad=15)
     plt.xlabel('Estimated Diameter (km, log scale)'); plt.ylabel('Number of NEOs')
@@ -1224,34 +1232,39 @@ def plot_neo_size_distribution(df_viz, color=BLUE):
 
 
 def plot_avg_neo_size_per_week(df_viz, color=BLUE):
-    """(c) Bar plot: gennemsnitlig NEO-størrelse pr. uge."""
+    """(c) Bar plot: average NEO size per week."""
     sns.set_theme(style="white")
-
+ 
+    # Compute the average diameter for each week
     weekly_avg = df_viz.groupby('week')['size_km'].mean()
-
+ 
     plt.figure(figsize=(12, 4))
     sns.barplot(x=list(range(len(weekly_avg))), y=weekly_avg.values, color=color)
     sns.despine()
     plt.title('Average NEO Size per Week', fontsize=14, fontweight='bold', loc='left', pad=15)
     plt.xlabel('Week index (1 = first week)'); plt.ylabel('Average Diameter (km)')
-    plt.xticks([])  # for mange uger til at vise alle labels
+    plt.xticks([])  # hide x-tick labels: there are too many weeks to be readable
     plt.tight_layout(); plt.show()
 
 
 def plot_neo_weekday_heatmap(df_viz):
-    """(d) Seaborn heatmap: antal NEOs pr. ugedag x uge."""
+    """(d) Seaborn heatmap: number of NEOs per weekday x week."""
     sns.set_theme(style="white")
-
-    # Arbejd på en kopi, så df_viz ikke muteres af de ekstra kolonner
+ 
     df = df_viz.copy()
+ 
+    # Create a weekday column
     df['weekday'] = pd.Categorical(
         df['date'].dt.day_name(),
         categories=['Monday', 'Tuesday', 'Wednesday', 'Thursday',
                     'Friday', 'Saturday', 'Sunday'], ordered=True)
+    # ISO week number (1-53) is used as the columns of the heatmap.
     df['iso_week'] = df['date'].dt.isocalendar().week
+ 
+    # Pivot table = grid: rows = weekday, columns = week, cell = number of asteroids.
     pivot = df.pivot_table(index='weekday', columns='iso_week',
                            values='id', aggfunc='count', fill_value=0)
-
+ 
     plt.figure(figsize=(14, 3.2))
     sns.heatmap(pivot, cmap='rocket', cbar_kws={'label': 'Number of NEOs'})
     plt.title('NEOs: Weekday x Week of Year', fontsize=14, fontweight='bold', loc='left', pad=15)
@@ -1261,12 +1274,105 @@ def plot_neo_weekday_heatmap(df_viz):
 
 def run_task3_visualizations(data):
     """Convenience wrapper: build the dataframe and draw all four plots.
-
+ 
     Returns the dataframe in case you want to inspect it afterwards.
     """
+    # Build the dataset once and reuse it for all four plots.
     df_viz = build_neo_viz_dataframe(data)
     plot_neos_per_week(df_viz)
     plot_neo_size_distribution(df_viz)
     plot_avg_neo_size_per_week(df_viz)
     plot_neo_weekday_heatmap(df_viz)
+    # Return df_viz so the table can be inspected afterwards if needed.
     return df_viz
+
+
+#________________________________________________________________________________________________________
+#Nasa
+
+#Task 4+5: Data Visualization Part B
+
+import random
+import pandas as pd
+
+
+def get_a_random_chunk_property(data):
+    """Returnerer en tilfældig egenskab fra en tilfældig asteroide i datasættet."""
+    chunk = random.choice(data)
+    date  = random.choice(list(chunk['near_earth_objects'].keys()))
+    neo   = random.choice(chunk['near_earth_objects'][date])
+    prop  = random.choice(list(neo.keys()))
+    return {prop: neo[prop]}
+
+
+def build_neo_dataframe(data):
+    """
+    Bygger et Pandas DataFrame fra rådata fra NASA\'s NEO API.
+
+    Returnerer én række per (asteroide, dato) med:
+        id, name, date, size_km, is_hazardous,
+        distance_km, velocity_kmh, Status, week
+
+    NEOs uden close_approach_data springes over.
+    """
+    records = []
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for date, neos in chunk['near_earth_objects'].items():
+            for neo in neos:
+                if not neo['close_approach_data']:
+                    continue
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                records.append({
+                    'id':           neo['id'],
+                    'name':         neo['name'],
+                    'date':         pd.to_datetime(date),
+                    'size_km':      (min_dia + max_dia) / 2,
+                    'is_hazardous': neo['is_potentially_hazardous_asteroid'],
+                    'distance_km':  float(neo['close_approach_data'][0]['miss_distance']['kilometers']),
+                    'velocity_kmh': float(neo['close_approach_data'][0]['relative_velocity']['kilometers_per_hour']),
+                })
+
+    df = pd.DataFrame(records).drop_duplicates(subset=['id', 'date'])
+    df['Status'] = df['is_hazardous'].map({True: 'Hazardous (PHA)', False: 'Harmless'})
+    df['week']   = df['date'].dt.to_period('W').apply(lambda p: p.start_time)
+    return df
+
+
+def get_daily_sizes(data):
+    """
+    Returnerer en dict { 'YYYY-MM-DD': [størrelser_km] } for alle NEOs.
+    Bruges til at beregne daglige gennemsnit, median mm.
+    """
+    daily = {}
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for date, neos in chunk['near_earth_objects'].items():
+            if date not in daily:
+                daily[date] = []
+            for neo in neos:
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                daily[date].append((min_dia + max_dia) / 2)
+    return daily
+
+
+def get_all_sizes(data):
+    """
+    Returnerer en flad liste med gennemsnitsstørrelsen (km) for ALLE NEOs.
+    Bruges til statistisk analyse på tværs af hele datasættet.
+    """
+    sizes = []
+    for chunk in data:
+        if 'near_earth_objects' not in chunk:
+            continue
+        for neos in chunk['near_earth_objects'].values():
+            for neo in neos:
+                min_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_min']
+                max_dia = neo['estimated_diameter']['kilometers']['estimated_diameter_max']
+                sizes.append((min_dia + max_dia) / 2)
+    return sizes
+
