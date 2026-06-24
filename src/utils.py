@@ -757,11 +757,10 @@ def evaluate_prophet_forecast(df, taxi_type="Yellow", split_date='2019-11-01', z
     
     return model, forecast
 
-
-
 import random
+
 def get_a_random_chunk_property(data):
-    """Returnerer en tilfældig egenskab fra en tilfældig asteroide i datasættet."""
+    """Returns a random property from a random asteroid in the dataset."""
     chunk = random.choice(data)
     date  = random.choice(list(chunk['near_earth_objects'].keys()))
     neo   = random.choice(chunk['near_earth_objects'][date])
@@ -771,13 +770,13 @@ def get_a_random_chunk_property(data):
 
 def build_neo_dataframe(data):
     """
-    Bygger et Pandas DataFrame fra rådata fra NASA\'s NEO API.
+    Builds a Pandas DataFrame from raw data from NASA's NEO API.
 
-    Returnerer én række per (asteroide, dato) med:
+    Returns one row per (asteroid, date) with:
         id, name, date, size_km, is_hazardous,
         distance_km, velocity_kmh, Status, week
 
-    NEOs uden close_approach_data springes over.
+    NEOs without close_approach_data are skipped.
     """
     records = []
     for chunk in data:
@@ -807,8 +806,8 @@ def build_neo_dataframe(data):
 
 def get_daily_sizes(data):
     """
-    Returnerer en dict { 'YYYY-MM-DD': [størrelser_km] } for alle NEOs.
-    Bruges til at beregne daglige gennemsnit, median mm.
+    Returns a dict { 'YYYY-MM-DD': [sizes_km] } for all NEOs.
+    Used to calculate daily averages, median, etc.
     """
     daily = {}
     for chunk in data:
@@ -826,8 +825,8 @@ def get_daily_sizes(data):
 
 def get_all_sizes(data):
     """
-    Returnerer en flad liste med gennemsnitsstørrelsen (km) for ALLE NEOs.
-    Bruges til statistisk analyse på tværs af hele datasættet.
+    Returns a flat list with the average size (km) for ALL NEOs.
+    Used for statistical analysis across the entire dataset.
     """
     sizes = []
     for chunk in data:
@@ -843,15 +842,13 @@ def get_all_sizes(data):
 
 def load_data_from_google_drive(url):
     """
-    Loader en CSV-fil direkte fra Google Drive.
-    Konverterer den delte link-URL til en download-URL automatisk.
+    Loads a CSV file directly from Google Drive.
+    Automatically converts the shared link URL to a download URL.
     """
-    import pandas as pd
+
     url_processed = 'https://drive.google.com/uc?id=' + url.split('/')[-2]
     df = pd.read_csv(url_processed)
     return df
-
-
 
 
 
