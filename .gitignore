@@ -164,4 +164,4 @@ Desktop.ini
 *.swp
 *.swo
 *~
-*.html ### Keep HTML files for visualization outputs
+*.html ### Keep HTML files for visualization outputs ignored for github otherwise push not possible
