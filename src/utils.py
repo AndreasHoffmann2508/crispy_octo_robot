@@ -67,6 +67,7 @@ def load_data_from_google_drive(url):
 
 
 
+
 # Function that cleans the dataframe for different outliers and other irrelevant data
 def clean_taxi_data(df, remove_outliers=True):
     """
@@ -839,16 +840,6 @@ def get_all_sizes(data):
                 sizes.append((min_dia + max_dia) / 2)
     return sizes
 
-
-def load_data_from_google_drive(url):
-    """
-    Loads a CSV file directly from Google Drive.
-    Automatically converts the shared link URL to a download URL.
-    """
-
-    url_processed = 'https://drive.google.com/uc?id=' + url.split('/')[-2]
-    df = pd.read_csv(url_processed)
-    return df
 
 
 
